@@ -23,6 +23,7 @@ class Less_Tree_Selector extends Less_Tree{
 
 	public $_oelements;
 	public $_oelements_len;
+	public $_oelements_key;
 	public $cacheable = true;
 
 	/**
@@ -47,6 +48,7 @@ class Less_Tree_Selector extends Less_Tree{
 
     public function accept($visitor) {
 		$this->elements = $visitor->visitArray($this->elements);
+		$this->elements_len = count($this->elements);
 		$this->extendList = $visitor->visitArray($this->extendList);
 		if( $this->condition ){
 			$this->condition = $visitor->visitObj($this->condition);
@@ -108,6 +110,9 @@ class Less_Tree_Selector extends Less_Tree{
 				array_shift($this->_oelements);
 				$this->_oelements_len--;
 			}
+		}
+		foreach($this->_oelements as $element) {
+			$this->_oelements_key[$element] = $element;
 		}
 	}
 

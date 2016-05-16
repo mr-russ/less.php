@@ -181,33 +181,34 @@ class Less_Visitor_processExtends extends Less_Visitor{
 
 	private function findMatch($extend, $haystackSelectorPath ){
 
-
 		if( !$this->HasMatches($extend, $haystackSelectorPath) ){
 			return false;
 		}
-
 
 		//
 		// look through the haystack selector path to try and find the needle - extend.selector
 		// returns an array of selector matches that can then be replaced
 		//
 		$needleElements = $extend->selector->elements;
+		$first_el = isset($extend->selector->_oelements[0]) ? $extend->selector->_oelements[0] : '';
 		$potentialMatches = array();
 		$potentialMatches_len = 0;
 		$potentialMatch = null;
 		$matches = array();
-
+		$beenonce = $extend->allowBefore;
 
 
 		// loop through the haystack elements
 		$haystack_path_len = count($haystackSelectorPath);
-		for($haystackSelectorIndex = 0; $haystackSelectorIndex < $haystack_path_len; $haystackSelectorIndex++ ){
-			$hackstackSelector = $haystackSelectorPath[$haystackSelectorIndex];
+		foreach($haystackSelectorPath as $haystackSelectorIndex => $hackstackSelector) {
 
-			$haystack_elements_len = count($hackstackSelector->elements);
-			for($hackstackElementIndex = 0; $hackstackElementIndex < $haystack_elements_len; $hackstackElementIndex++ ){
+			// Skip this one if we don't need to look through it as it can't possibly match.
+			if( !(!$hackstackSelector->cacheable || isset($hackstackSelector->_oelements_key[$first_el])) && !$extend->allowBefore){
+				continue;
+			}
 
-				$haystackElement = $hackstackSelector->elements[$hackstackElementIndex];
+			$haystack_elements_len = $hackstackSelector->elements_len;
+			foreach($hackstackSelector->elements as $hackstackElementIndex => $haystackElement) {
 
 				// if we allow elements before our match we can add a potential match every time. otherwise only at the first element.
 				if( $extend->allowBefore || ($haystackSelectorIndex === 0 && $hackstackElementIndex === 0) ){
@@ -215,17 +216,17 @@ class Less_Visitor_processExtends extends Less_Visitor{
 					$potentialMatches_len++;
 				}
 
+				$impossiblematch = !$extend->allowAfter && ($hackstackElementIndex+1 < $haystack_elements_len || $haystackSelectorIndex+1 < $haystack_path_len);
 				for($i = 0; $i < $potentialMatches_len; $i++ ){
 
-					$potentialMatch = &$potentialMatches[$i];
-					$potentialMatch = $this->PotentialMatch( $potentialMatch, $needleElements, $haystackElement, $hackstackElementIndex );
+					$potentialMatch = $this->PotentialMatch( $potentialMatches[$i], $needleElements, $haystackElement, $hackstackElementIndex );
 
 
 					// if we are still valid and have finished, test whether we have elements after and whether these are allowed
 					if( $potentialMatch && $potentialMatch['matched'] === $extend->selector->elements_len ){
 						$potentialMatch['finished'] = true;
 
-						if( !$extend->allowAfter && ($hackstackElementIndex+1 < $haystack_elements_len || $haystackSelectorIndex+1 < $haystack_path_len) ){
+						if( $impossiblematch ){
 							$potentialMatch = null;
 						}
 					}
@@ -236,9 +237,10 @@ class Less_Visitor_processExtends extends Less_Visitor{
 							$potentialMatch['length'] = $extend->selector->elements_len;
 							$potentialMatch['endPathIndex'] = $haystackSelectorIndex;
 							$potentialMatch['endPathElementIndex'] = $hackstackElementIndex + 1; // index after end of match
+							$matches[] = $potentialMatch;
 							$potentialMatches = array(); // we don't allow matches to overlap, so start matching again
 							$potentialMatches_len = 0;
-							$matches[] = $potentialMatch;
+							break;
 						}
 						continue;
 					}
@@ -265,11 +267,7 @@ class Less_Visitor_processExtends extends Less_Visitor{
 		$first_el = $extend->selector->_oelements[0];
 
 		foreach($haystackSelectorPath as $hackstackSelector){
-			if( !$hackstackSelector->cacheable ){
-				return true;
-			}
-
-			if( in_array($first_el, $hackstackSelector->_oelements) ){
+			if( !$hackstackSelector->cacheable || isset($hackstackSelector->_oelements_key[$first_el])){
 				return true;
 			}
 		}
@@ -281,7 +279,7 @@ class Less_Visitor_processExtends extends Less_Visitor{
 	/**
 	 * @param integer $hackstackElementIndex
 	 */
-	private function PotentialMatch( $potentialMatch, $needleElements, $haystackElement, $hackstackElementIndex ){
+	private function PotentialMatch( &$potentialMatch, $needleElements, $haystackElement, $hackstackElementIndex ){
 
 
 		if( $potentialMatch['matched'] > 0 ){
